@@ -137,11 +137,37 @@
         .status-loading {
             background-color: #ff9800;
         }
+        .language-selector {
+            margin-bottom: 15px;
+            text-align: right;
+        }
+        #language-select {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            background-color: white;
+            font-size: 14px;
+        }
+        .language-info {
+            font-size: 12px;
+            color: #777;
+            font-style: italic;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Legal Advisor Chatbot</h1>
+        
+        <div class="language-selector">
+            <label for="language-select">Select Language: </label>
+            <select id="language-select" onchange="changeLanguage()">
+                <option value="en">English</option>
+                <!-- Other languages will be added dynamically -->
+            </select>
+            <div class="language-info">You can ask questions in your selected language</div>
+        </div>
         
         <div class="chat-container" id="chat-container">
             <div class="intro-message">
@@ -165,15 +191,63 @@
             <h3>Debug Information</h3>
             <p>API Status: <span id="api-status"><span class="status-indicator status-loading"></span>Checking...</span></p>
             <p>Available Models: <span id="available-models">Checking...</span></p>
+            <p>Available Languages: <span id="available-languages">Checking...</span></p>
             <button onclick="checkAPIStatus()">Refresh Status</button>
         </div>
     </div>
 
     <script>
-        // Check API status on page load
+        let currentLanguage = 'en';
+        
+        // Load languages on page load
         window.onload = function() {
+            loadLanguages();
             checkAPIStatus();
         };
+        
+        // Load available languages from the backend
+        async function loadLanguages() {
+            try {
+                const response = await fetch('/api/languages');
+                const data = await response.json();
+                
+                const languageSelect = document.getElementById('language-select');
+                languageSelect.innerHTML = '';
+                
+                Object.entries(data.languages).forEach(([code, name]) => {
+                    const option = document.createElement('option');
+                    option.value = code;
+                    option.textContent = name;
+                    languageSelect.appendChild(option);
+                });
+                
+                // Set default language
+                languageSelect.value = 'en';
+            } catch (error) {
+                console.error('Error loading languages:', error);
+            }
+        }
+        
+        // Change language
+        function changeLanguage() {
+            const languageSelect = document.getElementById('language-select');
+            currentLanguage = languageSelect.value;
+            
+            // Update placeholder text based on selected language
+            updatePlaceholderText();
+        }
+        
+        // Update placeholder text based on selected language
+        function updatePlaceholderText() {
+            const userInput = document.getElementById('user-input');
+            
+            if (currentLanguage === 'en') {
+                userInput.placeholder = "Type your legal question here...";
+            } else {
+                // We could translate these placeholders too, but for simplicity keeping generic
+                userInput.placeholder = "Type your question in your selected language...";
+            }
+        }
         
         // Toggle debug section
         function toggleDebug() {
@@ -192,9 +266,11 @@
         async function checkAPIStatus() {
             const apiStatus = document.getElementById('api-status');
             const availableModels = document.getElementById('available-models');
+            const availableLanguages = document.getElementById('available-languages');
             
             apiStatus.innerHTML = '<span class="status-indicator status-loading"></span>Checking...';
             availableModels.textContent = 'Checking...';
+            availableLanguages.textContent = 'Checking...';
             
             try {
                 const response = await fetch('/api/debug');
@@ -211,9 +287,19 @@
                 } else {
                     availableModels.textContent = 'No models available';
                 }
+                
+                if (data.available_languages) {
+                    const languages = Object.entries(data.available_languages)
+                        .map(([code, name]) => `${name} (${code})`)
+                        .join(', ');
+                    availableLanguages.textContent = languages;
+                } else {
+                    availableLanguages.textContent = 'No languages available';
+                }
             } catch (error) {
                 apiStatus.innerHTML = '<span class="status-indicator status-error"></span>Error: ' + error.message;
                 availableModels.textContent = 'Unable to check';
+                availableLanguages.textContent = 'Unable to check';
             }
         }
         
@@ -243,13 +329,16 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
             
             try {
-                // Send request to backend
+                // Send request to backend with language info
                 const response = await fetch('/api/legal-advice', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query })
+                    body: JSON.stringify({ 
+                        query: query,
+                        language: currentLanguage
+                    })
                 });
                 
                 const data = await response.json();
@@ -269,6 +358,8 @@
                     <div class="bot-message">
                         <strong>Legal Advisor:</strong> ${data.response.replace(/\n/g, '<br>')}
                         <div class="disclaimer">${data.disclaimer}</div>
+                        ${data.translated_language !== 'en' ? 
+                            `<div class="language-info">Response in ${document.getElementById('language-select').options[document.getElementById('language-select').selectedIndex].text}</div>` : ''}
                     </div>
                 `;
                 chatContainer.appendChild(botMessageDiv);
