@@ -10,7 +10,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configure the Gemini API
-API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCXCNEwz7GPIbZb3z0SOoyWlQPXui_vNT8")
+API_KEY = os.getenv("GEMINI_API_KEY", "")
 if not API_KEY:
     raise ValueError("No Gemini API key found. Set GEMINI_API_KEY in your .env file.")
 
